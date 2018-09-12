@@ -1,0 +1,159 @@
+系统预定义异常(有名字的错误代码):
+TOO_MANY_ROWS : SELECT INTO返回多行
+INVALID_CURSOR :非法指针操作(关闭已经关闭的游标)
+ZERO_DIVIDE :除数等于零
+DUP_VAL_ON_INDEX :违反唯一性约束
+ACCESS_INTO_NULL: 未定义对象 
+CASE_NOT_FOUND: CASE 中若未包含相应的 WHEN ，并且没有设置 ELSE 时 
+COLLECTION_IS_NULL: 集合元素未初始化 
+CURSER_ALREADY_OPEN: 游标已经打开 
+DUP_VAL_ON_INDEX: 唯一索引对应的列上有重复的值 
+INVALID_NUMBER: 内嵌的 SQL 语句不能将字符转换为数字 
+NO_DATA_FOUND: 使用 select into 未返回行，或应用索引表未初始化的元素时 
+SUBSCRIPT_BEYOND_COUNT:元素下标超过嵌套表或 VARRAY 的最大值 
+SUBSCRIPT_OUTSIDE_LIMIT: 使用嵌套表或 VARRAY 时，将下标指定为负数  
+VALUE_ERROR: 赋值时，变量长度不足以容纳实际数据 
+LOGIN_DENIED: PL/SQL 应用程序连接到 oracle 数据库时，提供了不正确的用户名或密码 
+NOT_LOGGED_ON: PL/SQL 应用程序在没有连接 oralce 数据库的情况下访问数据 
+PROGRAM_ERROR: PL/SQL 内部问题，可能需要重装数据字典＆ pl./SQL 系统包 
+ROWTYPE_MISMATCH: 宿主游标变量与 PL/SQL 游标变量的返回类型不兼容 
+SELF_IS_NULL: 使用对象类型时，在 null 对象上调用对象方法 
+STORAGE_ERROR: 运行 PL/SQL 时，超出内存空间 
+SYS_INVALID_ID: 无效的 ROWID 字符串 
+TIMEOUT_ON_RESOURCE: Oracle 在等待资源时超时 
+
+练习 1:捕获预定义异常
+declare
+  v1 emp.sal%type;
+begin
+  select sal into v1 from emp;
+end;
+/
+
+declare
+  v1 emp.sal%type;
+begin
+  select sal into v1 from emp;
+exception
+  when TOO_MANY_ROWS then
+   dbms_output.put_line(sqlcode||';'||sqlerrm);
+end;
+/
+
+练习 2:捕获预定义异常
+declare
+  v1 emp.sal%type;
+begin
+  select sal into v1 from emp where empno=7777;
+exception
+  when TOO_MANY_ROWS then
+    dbms_output.put_line('more person !');
+--  when NO_DATA_FOUND then
+--    dbms_output.put_line('no rows selected!');
+  when others then --other执行器
+    dbms_output.put_line(sqlcode||';'||sqlerrm);
+end;
+/
+
+练习 3:捕获非预定义异常(捕获oracle错误代码)
+declare
+  fk_error  exception;--声明异常
+  pragma exception_init(fk_error,-2292);--使用编译指示器将异常名称和oracle的错误代码绑定
+begin
+  delete dept; --oracle自动传播错误（fk_error）
+  dbms_output.put_line('ok');
+exception
+  when TOO_MANY_ROWS then
+    dbms_output.put_line('more person ');
+  when NO_DATA_FOUND then
+    dbms_output.put_line('no person ');
+  when fk_error then
+    dbms_output.put_line('infringe forign key !');  
+end;
+/
+
+练习 4:捕获错误代码和错误描述,借助预定义函数sqlcode(ERROR代码),sqlerrm(ERROR文本)
+begin
+  update emp set deptno=60;
+  dbms_output.put_line('ok');
+exception
+  when TOO_MANY_ROWS then
+    dbms_output.put_line('more person !');
+  when NO_DATA_FOUND then
+    dbms_output.put_line('no person !');
+  when others then --other执行器
+    dbms_output.put_line(sqlcode||';'||sqlerrm);
+end;
+/
+
+练习 5:捕获用户自定义的异常:
+declare
+  my_error EXCEPTION;
+  PRAGMA EXCEPTION_INIT(my_error, -20001);--编译指示,将命名的异常与ORACLE ERROR关联
+BEGIN
+  raise_application_error(-20001,'工资不能被改动!');--将异常传送到环境
+  UPDATE e SET SAL=1000;
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('未检索到数据!');
+  WHEN TOO_MANY_ROWS THEN
+    DBMS_OUTPUT.PUT_LINE('SELECT返回多行数据!');
+  WHEN MY_ERROR THEN
+    DBMS_OUTPUT.PUT_LINE('E表工资不可以被修改!');
+end;
+/
+
+练习 6:捕获用户自定义的异常
+declare
+  my_error EXCEPTION;
+  PRAGMA EXCEPTION_INIT(my_error, -20001);
+  v_empno number(4):=&p_empno;
+begin
+  IF TO_CHAR (SYSDATE, 'HH24') NOT BETWEEN '08' AND '14' OR TO_CHAR (SYSDATE, 'DY') IN ('星期六', '星期日') THEN
+    RAISE my_error;
+  else
+    insert into e(empno) values (v_empno);
+    dbms_output.put_line('insert 成功!');
+  END IF;
+exception
+  when my_error then
+    dbms_output.put_line('该时间段不能向E表插入数据!');
+end;
+/
+
+练习 7:打印 ORA-##### 错误编号和描述:
+SPOOL D:\ORACLE_ERROR.TXT
+SET SERVEROUTPUT ON
+DECLARE
+  ERR_MSG VARCHAR2(4000);
+  ERR_CODE NUMBER(10);
+BEGIN
+  DBMS_OUTPUT.ENABLE(1000000);
+  FOR ERR_NUM IN 20000..20999
+  LOOP
+    ERR_CODE:=sqlcode;
+    ERR_MSG := SQLERRM(-ERR_NUM);
+     IF ERR_MSG NOT LIKE '%Message '||ERR_NUM||' not found%' then
+       dbms_output.put_line(ERR_MSG);
+     END IF;
+  END LOOP;
+END;
+/
+SPOOL OFF;
+
+declare
+  v_ename varchar2(10);
+begin
+  select ename into v_ename from emp where empno=7839;
+  dbms_output.put_line(v_ename);
+    declare
+      v1 emp.sal%type;
+    begin
+      select sal into v1 from emp;
+    exception
+      when TOO_MANY_ROWS then
+       dbms_output.put_line(sqlcode||';'||sqlerrm);
+    end;
+  dbms_output.put_line('ok');
+end;
+/

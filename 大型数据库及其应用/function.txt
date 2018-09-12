@@ -1,0 +1,164 @@
+一定要返回值并且只能返回一个值
+练习 1:
+CREATE OR REPLACE FUNCTION get_sal
+(p_id IN emp.empno%TYPE)
+RETURN NUMBER
+IS
+  v_salary emp.sal%TYPE :=0;
+BEGIN
+  SELECT sal
+   INTO v_salary
+  FROM emp
+  WHERE empno = p_id;
+  RETURN v_salary;
+END get_sal;
+/
+
+function调用
+VARIABLE g_salary NUMBER
+EXECUTE :g_salary := get_sal(7369);
+PRINT g_salary
+
+declare
+  v_sal number;
+begin
+  v_sal:=get_sal(7788);
+  dbms_output.put_line(v_sal);
+end;
+/
+
+select get_sal(7369) from dual;
+
+练习 2:
+CREATE OR REPLACE FUNCTION tax(p_value IN NUMBER)
+RETURN NUMBER 
+IS
+BEGIN
+  RETURN (p_value * 0.08);
+END tax;
+/
+
+SELECT empno, ename, sal, tax(sal)
+FROM emp
+WHERE deptno = 10;
+
+练习 3:
+create or replace FUNCTION valid_deptno
+    (v_deptno IN d.deptno%TYPE)
+RETURN BOOLEAN
+IS	
+    v_dummy  VARCHAR2(1);
+BEGIN
+    SELECT 'x'
+    INTO   v_dummy
+    FROM   d
+    WHERE  deptno = v_deptno;
+    RETURN (TRUE);
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN 
+      RETURN(FALSE);
+END valid_deptno;
+/
+
+练习 4:确定返回值函数与效率(可以减少函数调用次数，出现在where条件中更有利！)
+准备实验用表:
+create table t1 (id varchar2(10));
+
+begin
+  for i in 1..10 loop
+   insert into t1 values ('A');
+  end loop;
+  commit;
+end;
+/
+
+创建包声明全局变量，用来做函数调用次数的计数器
+create or replace package p as
+g_no number default 0;
+end;
+/
+
+显示全局变量的值
+exec dbms_output.put_line(chr(10)||p.g_no);
+
+
+在函数中使全局变量自增
+conn  / as sysdba
+@?/rdbms/admin/dbmslock
+grant execute on dbms_lock to public;
+conn scott/tiger
+
+创建一个普通函数
+create or replace function wait_row(i_v   in varchar2,
+                                    i_sec in number default 5)
+  return varchar2
+  parallel_enable 
+as
+begin
+  p.g_no := p.g_no+1;--函数每调用一次计数器加1
+  sys.dbms_lock.sleep(i_sec);--休眠的时间值
+  return i_v;
+end;
+/
+
+调用函数:
+select wait_row(id,0.1) from t1;
+
+通过显示全局变量的当前值查看普通函数的工作次数
+exec dbms_output.put_line(chr(10)||p.g_no); 
+
+10 --> 函数调用10次
+
+将全局变量归零:
+exec p.g_no := 0;
+
+创建确定返回值函数:
+create or replace function wait_row(i_v   in varchar2,
+                                    i_sec in number default 5)
+  return varchar2 deterministic
+  parallel_enable 
+as
+begin
+  p.g_no := p.g_no+1;
+  sys.dbms_lock.sleep(i_sec);
+  return i_v;
+end;
+/
+
+再次调用函数:
+select wait_row(id,0.1) from t1;
+
+通过显示全局变量的当前值查看确定返回值函数的工作次数
+exec dbms_output.put_line(chr(10)||p.g_no); 
+2 --> 函数调用2次，
+
+说明在形式参数取值相同的时候确定
+返回值函数的调用次数比普通函数少！意味着确定返回值
+函数的效率会高于普通函数！
+
+练习 5:确定返回值函数与基于函数的索引
+create or replace function format_date (v_date date)
+return varchar2
+is
+begin
+  return to_char(v_date,'yyyymmdd');
+end;
+/
+
+orcl@ SCOTT> create index i_emp_hdate on emp(format_date(hiredate));
+create index i_emp_hdate on emp(format_date(hiredate))
+                                *
+ERROR at line 1:
+ORA-30553: The function is not deterministic
+
+create or replace function format_date (v_date date)
+return varchar2 deterministic
+is
+begin
+  return to_char(v_date,'yyyymmdd');
+end;
+/
+
+orcl@ SCOTT> create index i_emp_hdate on emp(format_date(hiredate));
+
+Index created.

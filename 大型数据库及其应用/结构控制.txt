@@ -1,0 +1,162 @@
+使用IF语句按条件判断,控制PL/SQL执行流程:
+if-then-end if
+if-then-else-end if
+if-then-elsif-then-else-end if
+
+set serveroutput on
+declare
+  v_hire_date date := to_date('1995-01-15','yyyy-mm-dd');
+  v_five_years boolean;
+begin
+    if months_between(sysdate,v_hire_date)/12 > 5 then
+      v_five_years := true;
+    dbms_output.put_line('true');
+    else
+      v_five_years := false;
+    dbms_output.put_line('false');
+  end if;
+end;
+/
+
+使用CASE表达式:
+set serveroutput on
+define p_grade='a'
+declare
+  v_grade char(1) := upper('&p_grade');
+  v_appraisal varchar2(20);
+begin
+  v_appraisal :=
+    case v_grade
+        when 'A' then 'excellent'
+        when 'B' then 'very good'
+        when 'C' then 'good'
+      else 'no such grade!'
+    end;
+  dbms_output.put_line ('grade: '|| v_grade || ' appraisal ' || v_appraisal);
+end;
+/
+
+DECLARE
+  v_grade CHAR(1) := UPPER('&p_grade');
+  v_appraisal VARCHAR2(20);
+BEGIN
+  v_appraisal :=
+  CASE --省略
+  WHEN v_grade='A' THEN 'Excellent'
+  WHEN v_grade='B' THEN 'Very Good'
+  WHEN v_grade='C' THEN 'Good'
+  ELSE 'No such grade'
+  END;
+  DBMS_OUTPUT.PUT_LINE ('Grade: '|| v_grade || ' Appraisal ' || v_appraisal);
+END;
+/
+
+循环遍历控制:
+1.基本LOOP循环:
+set serveroutput on
+declare
+  i integer :=1;
+begin
+  loop
+    dbms_output.put_line(i);
+    i := i+1;
+    exit when i>10;
+  end loop;
+end;
+/
+
+while循环:
+declare
+  i integer :=1;
+begin
+  while i<=10 loop
+    dbms_output.put_line(i);
+    i := i+1;
+  end loop;
+end;
+/
+
+数字for循环:
+begin
+  for i in 1..10 loop
+    dbms_output.put_line(i);
+  end loop;
+end;
+/
+
+begin
+  for i in reverse 1..10 loop 
+    dbms_output.put_line(i);
+  end loop;
+end;
+/
+
+
+实现双重循环
+    外循环和内循环都执行5次.
+    内外计数器变量名相同:i
+    显示内循环的计数器和外循环的计数器的乘积
+    当乘积超过15时候,退出
+declare
+  v_plus number(10);
+begin
+  <<outer_loop>>
+   for i in 1..5 loop
+     <<inner_loop>>
+     for i in 1..5 loop
+        v_plus:=i*outer_loop.i;
+        exit when v_plus>15;
+        dbms_output.put_line(v_plus);
+     end loop inner_loop;
+   end loop outer_loop;
+end;
+/
+
+标号和goto:
+declare
+   v_counter number := 1;
+begin
+   loop 
+       dbms_output.put_line('in loop V_counter current value:'||V_counter);
+       v_counter := v_counter + 1;
+     if v_counter > 10 then
+       goto l_ENDofLOOP;
+      end if;
+   end loop;
+   <<l_ENDofLOOP>>
+   dbms_output.put_line('end loop V_counter current value:'||V_counter);
+end;
+/
+
+写一个PL/SQL块
+   向dept表中循环插入5条记录
+   每一条记录的deptno 值比表中最大的deptno 值增加1
+   dname分别为"Test1" "Test2"..."Test5"
+   loc列的值都为空。
+
+declare
+   v_deptno scott.dept.deptno%type;
+   v_loop number(1):=1;
+begin
+   for i in 1..5 loop
+    select MAX(deptno) into v_deptno from dept; 
+    insert into dept(deptno,dname)
+    values ((v_deptno+1),('Test'||to_char(i)));
+--    commit;
+   end loop;
+end;
+/
+
+事务处理控制语句(COMMIT 和 ROLLBACK):
+CREATE TABLE T1(ID INT);
+(*批量提交，减少log file sync提高效率!)
+DECLARE 
+V_NUM NUMBER;
+BEGIN
+FOR V_LOOPCOUNTER IN 1..500 LOOP
+    INSERT INTO T1 VALUES (V_LOOPCOUNTER);
+    V_NUM := V_NUM + 1;
+    IF V_NUM = 50 THEN
+      COMMIT;
+      V_NUM := 0;
+    END IF;

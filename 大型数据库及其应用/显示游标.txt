@@ -1,0 +1,279 @@
+显式游标使用流程:
+1.声明 declare
+2.打开 opem
+3.获取 fetch
+4.关闭 close
+
+练习 1: 基本loop循环+显示游标的使用
+DECLARE
+  v_empno employees.employee_id%TYPE;
+  v_ename employees.last_name%TYPE;
+  CURSOR emp_cursor IS SELECT employee_id, last_name FROM employees; --声明
+BEGIN
+  OPEN emp_cursor; --打开
+  LOOP
+    FETCH emp_cursor INTO v_empno, v_ename; --获取
+    exit when emp_cursor%rowcount>20;
+    DBMS_OUTPUT.PUT_LINE (TO_CHAR(v_empno)||' '|| v_ename);
+  END LOOP;
+  CLOSE emp_cursor; --关闭
+END ;
+/
+
+练习 2: for循环+显示游标的使用
+DECLARE
+  v_empno employees.employee_id%TYPE;
+  v_ename employees.last_name%TYPE;
+  CURSOR emp_cursor IS SELECT employee_id, last_name FROM employees;
+BEGIN
+  OPEN emp_cursor;
+  FOR i IN 1..10 LOOP
+    FETCH emp_cursor INTO v_empno, v_ename;
+    DBMS_OUTPUT.PUT_LINE (TO_CHAR(v_empno)||' '|| v_ename);
+  END LOOP;
+  CLOSE emp_cursor;
+END ;
+/
+
+游标for循环:
+declare 
+  cursor emp_cursor is select rownum,employee_id,last_name from employees; --声明
+begin
+  for emp_record in emp_cursor loop --隐式打开隐式获取
+    exit when emp_cursor%rowcount>23;
+      dbms_output.put_line(emp_record.rownum||' '||
+                           emp_record.employee_id||' '||
+                           emp_record.last_name);
+  end loop; --隐式关闭
+end;
+/
+
+省略游标定义:
+begin
+  for r in (select last_name from employees) loop
+      dbms_output.put_line(r.last_name);
+  end loop;
+end;
+/
+
+高级显式游标(带参数的游标):
+练习 1:通过传入不同的参数使打开游标时取到不同的结果集
+declare
+  cursor c1 (p_deptno number,p_job varchar2)
+  is
+  select empno,ename
+  from emp
+  where deptno=p_deptno
+  and job=p_job;
+begin
+  Dbms_output.put_line('first fetch cursor!');
+  for r_c1 in c1(10,'MANAGER') loop --open cursor时传入不同的实际参数得到不同的游标上下文!
+    Dbms_output.put_line(r_c1.empno||' '||r_c1.ename);
+  end loop;
+
+  Dbms_output.put_line('second fetch cursor!');
+  for r_c1 in c1(20,'MANAGER') loop
+    Dbms_output.put_line(r_c1.empno||' '||r_c1.ename);
+  end loop;
+
+  Dbms_output.put_line('third fetch cursor!');
+  for r_c1 in c1(30,'MANAGER') loop
+    Dbms_output.put_line(r_c1.empno||' '||r_c1.ename);
+  end loop;
+end;
+/
+
+练习:获取每个部门前两个雇员的信息
+获取10部门前两个人的信息
+declare
+  cursor c1 is select * from scott.emp 
+                      where deptno=10;
+begin
+  for r1 in c1 loop
+    exit when c1%rowcount=3 or c1%notfound;
+    dbms_output.put_line(r1.ename||' '||r1.deptno);
+  end loop;
+end;
+/
+
+使用替代变量取指定部门的前两个人的信息
+declare
+  cursor c1 is select * from scott.emp 
+                      where deptno=&p_deptno;
+begin
+  for r1 in c1 loop
+    exit when c1%rowcount=3 or c1%notfound;
+    dbms_output.put_line(r1.ename||' '||r1.deptno);
+  end loop;
+end;
+/
+
+使用高级游标代替替代变量
+declare
+  cursor c1(p_deptno number) is select * from scott.emp 
+                      where deptno=p_deptno;
+begin
+  for r1 in c1(10) loop
+    exit when c1%rowcount=3 or c1%notfound;
+    dbms_output.put_line(r1.ename||' '||r1.deptno);
+  end loop;
+  for r1 in c1(20) loop
+    exit when c1%rowcount=3 or c1%notfound;
+    dbms_output.put_line(r1.ename||' '||r1.deptno);
+  end loop;
+  for r1 in c1(30) loop
+    exit when c1%rowcount=3 or c1%notfound;
+    dbms_output.put_line(r1.ename||' '||r1.deptno);
+  end loop;
+end;
+/
+
+使用循环嵌套简化上面的代码
+declare
+  cursor c2 is select distinct deptno from scott.emp;
+  cursor c1(p_deptno number) is 
+                     select * from scott.emp 
+                      where deptno=p_deptno;
+begin
+  for r2 in c2 loop
+    for r1 in c1(r2.deptno) loop
+      exit when c1%rowcount=3 or c1%notfound;
+      dbms_output.put_line(r1.ename||' '||r1.deptno);
+    end loop;
+  end loop;
+end;
+/
+
+练习 2:将每个部门工资小于2000的职员工资涨10%
+declare
+  cursor c1 is select deptno from scott.dept;
+  cursor c2 (p_deptno number,p_job varchar2)
+  is
+  select empno,ename,sal
+  from emp
+  where deptno=p_deptno
+  and job=p_job
+  for update of sal;
+begin
+  for r_c1 in c1 loop 
+    dbms_output.put_line('第'||c1%rowcount||'次获取游标c1' || '修改'||r_c1.deptno||'部门职员的工资');
+    for r_c2 in c2(r_c1.deptno,'CLERK') loop
+      if r_c2.sal<2000 then
+              update scott.emp set sal=sal*1.1
+              where current of c2;
+           end if;
+    end loop;
+  end loop;
+end;
+/
+
+
+
+
+练习3
+--打印所有数据库文件，并生成备份脚本
+--可以嵌入到shell脚本生成自动化备份
+
+set feedback off pagesize 0 heading off verify off
+set linesize 100 trimspool on
+set serveroutput on
+declare
+cursor c_datafile is
+        select file_id fid,substr(file_name,(instr(file_name,'/',-1)+1)) fname from dba_data_files;
+begin
+dbms_output.put_line('run {');
+dbms_output.put_line('allocate channel d1 type disk ; ');
+dbms_output.put_line('allocate channel d2 type disk ; ');
+dbms_output.put_line('copy ');
+for p_df in c_datafile loop
+        dbms_output.put_line(' datafile '||p_df.fid||' to '||''''||'$BACKUP_DIR/'||p_df.fname||'.bak'||''''||',');
+end loop;
+        dbms_output.put_line('current controlfile to ''$BACKUP_DIR/ctl.bak'';');
+dbms_output.put_line('release channel d1;');
+dbms_output.put_line('release channel d2;');
+dbms_output.put_line('}');
+dbms_output.put_line('exit ;');
+end ;
+
+
+
+练习4
+--dataguard archivelog删除脚本
+--可以嵌入到shell脚本生成自动化备份
+
+set linesize 100 trimspool on
+set serveroutput on
+declare
+-- v_driversite_name  varchar2(30) NOT NULL := 'bj' ;
+ v_driversite_archivedlog_seq  number;
+begin
+-- select max(sequence#) into   v_driversite_archivedlog_seq.sequence#    from v$archvied_log@bj where  archived='YES' and applied='YES'  ;
+	select  max(sequence#) into   v_driversite_archivedlog_seq from v$archived_log where  archived='YES' ;
+	dbms_output.put_line('rman target  / ');
+   dbms_output.put_line('{');
+	dbms_output.put_line('allocate channel c1 type disk ; ');
+	dbms_output.put_line('allocate channel c2 type disk ; ');
+	dbms_output.put_line(' delete noprompt archivelog until sequece= '|| v_driversite_archivedlog_seq ||' ; ');
+	dbms_output.put_line('release channel c1;');
+	dbms_output.put_line('release channel c2;');
+  dbms_output.put_line('}');
+end;
+/
+
+
+
+练习5
+--完整的嵌入shell里的dataguard archivelog删除脚本
+--作用： 1 先查询到物理standby database的应用并且归档了的archivelog 的max squence ;
+             2 再生成rman delete archivelog script
+             3  格式化
+             4  rman调用删除已在备库里备份且应用了的主库归档
+
+#!/bin/sh
+# created by yd at 20110422
+# define backup directory
+export BACKUP_DIR=/home/oracle/rman_bak
+export BACKUP_SCRIPT_DIR=/home/oracle/rman_script
+#create backup script file by sql spool
+#
+sqlplus /nolog <<EOF
+connect /as sysdba
+set feedback off pagesize 0 heading off verify off
+set linesize 100 trimspool on
+set serveroutput on
+spool $BACKUP_SCRIPT_DIR/bk_archivelog.rcv
+declare
+-- this for physical  standby database
+-- v_driversite_name  varchar2(30) NOT NULL := 'bj' ;
+ v_driversite_archivedlog_seq  number;
+begin
+-- this for physical  standby database
+-- select max(sequence#) into   v_driversite_archivedlog_seq.sequence#    from v$archvied_log@bj where  archived='YES' and applied='YES'  ;
+-- for local archivelog
+	select  max(sequence#) into   v_driversite_archivedlog_seq from v$archived_log where  archived='YES' ;
+	dbms_output.put_line('rman target  / ');
+   dbms_output.put_line('{');
+	dbms_output.put_line('allocate channel c1 type disk ; ');
+	dbms_output.put_line('allocate channel c2 type disk ; ');
+	dbms_output.put_line(' delete noprompt archivelog until sequece= '|| v_driversite_archivedlog_seq ||' ; ');
+	dbms_output.put_line('release channel c1;');
+	dbms_output.put_line('release channel c2;');
+  dbms_output.put_line('}');
+  dbms_output.put_line('exit');
+end;
+/
+spool off;
+host cat $BACKUP_SCRIPT_DIR/bk_archivelog.rcv|grep -v "^[ ]{1,3}[0-9]" | grep -v "SQL>" >$BACKUP_SCRIPT_DIR/bk_rman_archivelog.rcv
+exit
+EOF
+#
+rm -f $BACKUP_SCRIPT_DIR/bk_archivelog.rcv
+
+# begin backup
+#
+#rman<<!
+#connect target sys/oracle@test
+rman target sys/admin nocatalog <<!
+@$BACKUP_SCRIPT_DIR/bk_rman_archivelog.rcv
+list archivelog all;
+!
